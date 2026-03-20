@@ -21,12 +21,21 @@ func RunStatusAPI(repo *stats.Repository) gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{"error": "run not found"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{
-			"id":       run.ID,
-			"name":     run.Name,
-			"status":   run.Status,
-			"mode":     run.ExecutionMode,
-			"created":  run.CreatedAt,
-		})
+		resp := gin.H{
+			"id":         run.ID,
+			"name":       run.Name,
+			"status":     run.Status,
+			"mode":       run.ExecutionMode,
+			"created":    run.CreatedAt,
+			"started_at": run.CreatedAt.UTC().Format("2006-01-02T15:04:05Z"),
+		}
+
+		progress, err := repo.GetRunProgress(id)
+		if err == nil && progress != nil {
+			resp["executed_count"] = progress.ExecutedCount
+			resp["error_count"] = progress.ErrorCount
+		}
+
+		c.JSON(http.StatusOK, resp)
 	}
 }
