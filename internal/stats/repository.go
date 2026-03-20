@@ -231,6 +231,27 @@ func (r *Repository) GetRunTimeMsForRun(runID int64) ([]float64, error) {
 	return vals, rows.Err()
 }
 
+// RunProgress holds live progress counters for a running test.
+type RunProgress struct {
+	ExecutedCount int64 `json:"executed_count"`
+	ErrorCount    int64 `json:"error_count"`
+}
+
+// GetRunProgress counts total and errored query results for a run.
+func (r *Repository) GetRunProgress(runID int64) (*RunProgress, error) {
+	var p RunProgress
+	err := r.db.QueryRow(
+		`SELECT COUNT(*), COUNT(qr.error_message)
+		 FROM query_results qr
+		 JOIN queries q ON q.id = qr.query_id
+		 WHERE q.run_id = ?`, runID,
+	).Scan(&p.ExecutedCount, &p.ErrorCount)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
+}
+
 // ListRuns returns recent runs.
 func (r *Repository) ListRuns(limit int) ([]Run, error) {
 	if limit <= 0 {

@@ -31,11 +31,29 @@ templ RunStatusContent(run *stats.Run) {
 						<a href={ "/runs/" + strconv.FormatInt(run.ID, 10) + "/results" } class="btn btn-primary">View Results</a>
 						<a href={ "/runs/" + strconv.FormatInt(run.ID, 10) + "/export" } class="btn btn-outline">Export CSV</a>
 					</div>
-				} else if run.Status == "running" {
-					<div class="mt-4">
-						<p class="text-base-content/70">Run in progress. Refresh to update status.</p>
-						<a href={ "/runs/" + strconv.FormatInt(run.ID, 10) } class="btn btn-sm btn-ghost mt-2">Refresh</a>
+			} else if run.Status == "running" {
+				<div class="mt-4 space-y-4">
+					<div class="stats shadow">
+						<div class="stat">
+							<div class="stat-title">Elapsed Time</div>
+							<div class="stat-value text-primary" id="elapsed-time">00:00:00</div>
+						</div>
+						<div class="stat">
+							<div class="stat-title">Statements Executed</div>
+							<div class="stat-value" id="executed-count">0</div>
+						</div>
+						<div class="stat">
+							<div class="stat-title">Errors</div>
+							<div class="stat-value text-error" id="error-count">0</div>
+						</div>
 					</div>
+					<progress class="progress progress-primary w-full" id="run-progress"></progress>
+				</div>
+				<script
+					src="/static/js/run-status.js"
+					data-run-id={ strconv.FormatInt(run.ID, 10) }
+					data-started-at={ run.CreatedAt.UTC().Format("2006-01-02T15:04:05Z") }
+				></script>
 				}
 			</div>
 		</div>

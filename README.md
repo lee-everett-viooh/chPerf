@@ -19,6 +19,21 @@ A Go application for load testing ClickHouse databases. Submit SQL statements, r
 
 ## Quick Start
 
+### With Docker (no Go installation required)
+
+```bash
+docker compose up --build
+```
+
+Or without Compose:
+
+```bash
+docker build -t chperf .
+docker run -p 8085:8085 -v chperf-data:/app/data chperf
+```
+
+### Without Docker
+
 ```bash
 # Install templ (optional, for template changes)
 go install github.com/a-h/templ/cmd/templ@latest

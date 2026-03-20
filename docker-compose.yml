@@ -1,0 +1,12 @@
+services:
+  chperf:
+    build: .
+    ports:
+      - "8085:8085"
+    volumes:
+      - chperf-data:/app/data
+    environment:
+      - SQLITE_PATH=/app/data/chperf.db
+
+volumes:
+  chperf-data:
