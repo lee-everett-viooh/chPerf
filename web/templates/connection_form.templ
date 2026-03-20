@@ -1,0 +1,86 @@
+package templates
+
+import "chperf.example.com/internal/connections"
+
+templ ConnectionForm(conn *connections.Connection) {
+	@Layout(connectionFormTitle(conn), ConnectionFormContent(conn))
+}
+
+templ ConnectionFormContent(conn *connections.Connection) {
+	<div class="space-y-6">
+		<h1 class="text-3xl font-bold">{ connectionFormTitle(conn) }</h1>
+
+		<div id="test-result" class="alert hidden"></div>
+
+		<form id="connection-form" action={ connectionFormAction(conn) } method="POST" class="card bg-base-100 shadow-xl">
+			<div class="card-body space-y-4">
+				<div class="form-control">
+					<label class="label" for="name">
+						<span class="label-text">Connection Name</span>
+					</label>
+					<input type="text" id="name" name="name" placeholder="My ClickHouse" class="input input-bordered" required value={ connectionField(conn, "Name") }/>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="form-control">
+						<label class="label" for="host">
+							<span class="label-text">Host</span>
+						</label>
+						<input type="text" id="host" name="host" placeholder="127.0.0.1" class="input input-bordered" required value={ connectionField(conn, "Host") }/>
+					</div>
+					<div class="form-control">
+						<label class="label" for="port">
+							<span class="label-text">Port</span>
+						</label>
+						<input type="number" id="port" name="port" placeholder="9000" class="input input-bordered" value={ connectionPort(conn) }/>
+					</div>
+				</div>
+
+				<div class="form-control">
+					<label class="label" for="database">
+						<span class="label-text">Database</span>
+					</label>
+					<input type="text" id="database" name="database" placeholder="default" class="input input-bordered" value={ connectionField(conn, "Database") }/>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="form-control">
+						<label class="label" for="username">
+							<span class="label-text">Username</span>
+						</label>
+						<input type="text" id="username" name="username" placeholder="default" class="input input-bordered" value={ connectionField(conn, "Username") }/>
+					</div>
+					<div class="form-control">
+						<label class="label" for="password">
+							<span class="label-text">Password</span>
+						</label>
+						<input type="password" id="password" name="password" placeholder="" class="input input-bordered" value={ connectionField(conn, "Password") }/>
+					</div>
+				</div>
+
+				<div class="form-control">
+					<label class="label">
+						<span class="label-text">TLS</span>
+					</label>
+					<label class="label cursor-pointer justify-start gap-2">
+						if connectionTLSEnabled(conn) {
+							<input type="checkbox" id="tls_enabled" name="tls_enabled" value="on" class="toggle toggle-primary" checked/>
+						} else {
+							<input type="checkbox" id="tls_enabled" name="tls_enabled" value="on" class="toggle toggle-primary"/>
+						}
+						<span class="label-text">Use TLS</span>
+					</label>
+				</div>
+
+				<div class="card-actions justify-between">
+					<button type="button" id="test-btn" class="btn btn-outline">Test Connection</button>
+					<div>
+						<a href="/connections" class="btn btn-ghost">Cancel</a>
+						<button type="submit" class="btn btn-primary">Save</button>
+					</div>
+				</div>
+			</div>
+		</form>
+		<script src="/static/js/connection-form.js"></script>
+	</div>
+}

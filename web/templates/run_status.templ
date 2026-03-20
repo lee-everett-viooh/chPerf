@@ -1,0 +1,43 @@
+package templates
+
+import (
+	"strconv"
+
+	"chperf.example.com/internal/stats"
+)
+
+templ RunStatus(run *stats.Run) {
+	@Layout("Run Status", RunStatusContent(run))
+}
+
+templ RunStatusContent(run *stats.Run) {
+	<div class="space-y-6">
+		<h1 class="text-3xl font-bold">{ run.Name }</h1>
+
+		<div class="card bg-base-100 shadow-xl">
+			<div class="card-body">
+				<h2 class="card-title">Run Details</h2>
+				<div class="grid grid-cols-2 gap-4">
+					<div><span class="font-semibold">Status:</span> <span class={ statusBadgeClass(run.Status) }>{ run.Status }</span></div>
+					<div><span class="font-semibold">Mode:</span> { run.ExecutionMode }</div>
+					<div><span class="font-semibold">Concurrency:</span> { run.Concurrency }</div>
+					<div><span class="font-semibold">Iterations:</span> { run.Iterations }</div>
+					<div><span class="font-semibold">Duration:</span> { strconv.Itoa(run.DurationSec) }s</div>
+					<div><span class="font-semibold">Wait between queries:</span> { formatWaitMs(run.WaitBetweenQueriesMs) }</div>
+					<div><span class="font-semibold">Created:</span> { run.CreatedAt.Format("2006-01-02 15:04:05") }</div>
+				</div>
+				if run.Status == "completed" {
+					<div class="card-actions mt-4">
+						<a href={ "/runs/" + strconv.FormatInt(run.ID, 10) + "/results" } class="btn btn-primary">View Results</a>
+						<a href={ "/runs/" + strconv.FormatInt(run.ID, 10) + "/export" } class="btn btn-outline">Export CSV</a>
+					</div>
+				} else if run.Status == "running" {
+					<div class="mt-4">
+						<p class="text-base-content/70">Run in progress. Refresh to update status.</p>
+						<a href={ "/runs/" + strconv.FormatInt(run.ID, 10) } class="btn btn-sm btn-ghost mt-2">Refresh</a>
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}

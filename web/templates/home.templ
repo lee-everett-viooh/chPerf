@@ -1,0 +1,69 @@
+package templates
+
+import (
+	"strconv"
+
+	"chperf.example.com/internal/stats"
+)
+
+templ Home(runs []stats.Run) {
+	@Layout("Dashboard", HomeContent(runs))
+}
+
+templ HomeContent(runs []stats.Run) {
+	<div class="space-y-6">
+		<div class="flex justify-between items-center">
+			<h1 class="text-3xl font-bold">Dashboard</h1>
+			<a href="/runs/new" class="btn btn-primary">New Load Test</a>
+		</div>
+
+		<div class="card bg-base-100 shadow-xl">
+			<div class="card-body">
+				<h2 class="card-title">Recent Runs</h2>
+				if len(runs) == 0 {
+					<p class="text-base-content/70">No runs yet. Create a new load test to get started.</p>
+				} else {
+					<div class="overflow-x-auto">
+						<table class="table table-zebra">
+							<thead>
+								<tr>
+									<th>ID</th>
+									<th>Name</th>
+									<th>Mode</th>
+									<th>Concurrency</th>
+									<th>Status</th>
+									<th>Created</th>
+									<th>Actions</th>
+								</tr>
+							</thead>
+							<tbody>
+								for _, run := range runs {
+									<tr>
+										<td>{ run.ID }</td>
+										<td>{ run.Name }</td>
+										<td><span class="badge badge-outline">{ run.ExecutionMode }</span></td>
+										<td>{ run.Concurrency }</td>
+										<td>
+											<span class={ statusBadgeClass(run.Status) }>{ run.Status }</span>
+										</td>
+										<td>{ run.CreatedAt.Format("2006-01-02 15:04") }</td>
+										<td>
+											<a href={ "/runs/" + templ.URL(strconv.FormatInt(run.ID, 10)) } class="btn btn-sm btn-ghost">View</a>
+											if run.Status == "completed" {
+												<a href={ "/runs/" + templ.URL(strconv.FormatInt(run.ID, 10)) + "/results" } class="btn btn-sm btn-ghost">Results</a>
+												<a href={ "/runs/" + templ.URL(strconv.FormatInt(run.ID, 10)) + "/export" } class="btn btn-sm btn-ghost">Export CSV</a>
+											}
+											<form action={ "/runs/" + templ.URL(strconv.FormatInt(run.ID, 10)) + "/delete" } method="POST" class="inline-block" onsubmit="return confirm('Delete this run and all its results?');">
+												<button type="submit" class="btn btn-sm btn-ghost text-error">Delete</button>
+											</form>
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			</div>
+		</div>
+	</div>
+}

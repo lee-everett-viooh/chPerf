@@ -1,0 +1,5 @@
+{
+  "name": "chperf-web",
+  "private": true,
+  "description": "Optional: build Tailwind+DaisyUI for production (app uses CDN by default)"
+}

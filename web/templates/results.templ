@@ -1,0 +1,99 @@
+package templates
+
+import (
+	"strconv"
+
+	"chperf.example.com/internal/stats"
+)
+
+// ChartData is passed to the results page for Chart.js.
+type ChartData struct {
+	PerQuery    []QueryPercentiles   `json:"perQuery"`
+	Overall     stats.Percentiles    `json:"overall"`
+	QueryLabels []string             `json:"queryLabels"`
+	Timeseries  []QueryTimeseries    `json:"timeseries"`
+}
+
+// QueryTimeseries holds latency-over-time data for a single query.
+type QueryTimeseries struct {
+	QueryID    int64                    `json:"queryId"`
+	SQLPreview string                   `json:"sqlPreview"`
+	Points     []stats.TimeseriesPoint  `json:"points"`
+}
+
+// QueryPercentiles holds percentiles for a single query.
+type QueryPercentiles struct {
+	QueryID     int64             `json:"queryId"`
+	SQLPreview  string            `json:"sqlPreview"`
+	Percentiles stats.Percentiles `json:"percentiles"`
+}
+
+templ Results(run *stats.Run, queries []stats.Query, chartData ChartData, chartDataJSON string) {
+	@Layout("Results", ResultsContent(run, queries, chartData, chartDataJSON))
+}
+
+templ ResultsContent(run *stats.Run, queries []stats.Query, chartData ChartData, chartDataJSON string) {
+	<div class="space-y-6">
+		<div class="flex justify-between items-center">
+			<h1 class="text-3xl font-bold">Results: { run.Name }</h1>
+			<a href={ "/runs/" + strconv.FormatInt(run.ID, 10) + "/export" } class="btn btn-outline">Export CSV</a>
+		</div>
+
+		if len(chartData.Timeseries) > 0 {
+			<div class="card bg-base-100 shadow-xl">
+				<div class="card-body">
+					<h2 class="card-title">Latency Over Time (per query)</h2>
+					<p class="text-base-content/70 text-sm">Timeseries of each query execution to spot latency spikes.</p>
+					for i := range chartData.Timeseries {
+						<div class="mt-6">
+							<h3 class="font-semibold text-sm mb-2 truncate" title={ chartData.Timeseries[i].SQLPreview }>{ chartData.Timeseries[i].SQLPreview }</h3>
+							<div class="h-96">
+								<canvas id={ "ts-chart-" + strconv.Itoa(i) }></canvas>
+							</div>
+						</div>
+					}
+				</div>
+			</div>
+		}
+
+		<div class="card bg-base-100 shadow-xl">
+			<div class="card-body">
+				<h2 class="card-title">Percentile Table</h2>
+				<div class="overflow-x-auto">
+					<table class="table table-zebra">
+						<thead>
+							<tr>
+								<th>Query</th>
+								<th>P50 (ms)</th>
+								<th>P75 (ms)</th>
+								<th>P90 (ms)</th>
+								<th>P99 (ms)</th>
+							</tr>
+						</thead>
+						<tbody>
+							for i, qp := range chartData.PerQuery {
+								<tr>
+									<td class="max-w-xs truncate" title={ queries[i].SQLText }>{ qp.SQLPreview }</td>
+									<td>{ formatFloat(qp.Percentiles.P50) }</td>
+									<td>{ formatFloat(qp.Percentiles.P75) }</td>
+									<td>{ formatFloat(qp.Percentiles.P90) }</td>
+									<td>{ formatFloat(qp.Percentiles.P99) }</td>
+								</tr>
+							}
+							<tr class="font-bold">
+								<td>Overall</td>
+								<td>{ formatFloat(chartData.Overall.P50) }</td>
+								<td>{ formatFloat(chartData.Overall.P75) }</td>
+								<td>{ formatFloat(chartData.Overall.P90) }</td>
+								<td>{ formatFloat(chartData.Overall.P99) }</td>
+							</tr>
+						</tbody>
+					</table>
+				</div>
+			</div>
+		</div>
+
+		@RawJSONScript(chartDataJSON)
+		<script src="/static/js/results-charts.js"></script>
+	</div>
+}

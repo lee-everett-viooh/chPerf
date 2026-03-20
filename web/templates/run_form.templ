@@ -1,0 +1,112 @@
+package templates
+
+import (
+	"strconv"
+
+	"chperf.example.com/internal/connections"
+)
+
+templ RunForm(conns []connections.Connection, defaultConcurrency, defaultIterations, defaultDuration int) {
+	@Layout("New Run", RunFormContent(conns, defaultConcurrency, defaultIterations, defaultDuration))
+}
+
+templ RunFormContent(conns []connections.Connection, defaultConcurrency, defaultIterations, defaultDuration int) {
+	<div class="space-y-6">
+		<h1 class="text-3xl font-bold">New Load Test</h1>
+
+		<form action="/runs" method="POST" class="card bg-base-100 shadow-xl">
+			<div class="card-body space-y-4">
+				<div class="form-control">
+					<label class="label" for="name">
+						<span class="label-text">Run Name</span>
+					</label>
+					<input type="text" id="name" name="name" placeholder="My Load Test" class="input input-bordered" required/>
+				</div>
+
+				<div class="form-control">
+					<label class="label" for="connection_id">
+						<span class="label-text">Connection</span>
+					</label>
+					if len(conns) == 0 {
+						<div class="alert alert-warning">
+							<span>No connections defined. <a href="/connections/new" class="link font-semibold">Add a connection</a> first.</span>
+						</div>
+					} else {
+						<select id="connection_id" name="connection_id" class="select select-bordered" required>
+							<option value="">Select a connection...</option>
+							for _, conn := range conns {
+								<option value={ strconv.FormatInt(conn.ID, 10) }>{ conn.Name } ({ conn.Host }:{ strconv.Itoa(conn.Port) })</option>
+							}
+						</select>
+						<label class="label">
+							<a href="/connections/new" class="label-text-alt link">Add new connection</a>
+						</label>
+					}
+				</div>
+
+				<div class="form-control">
+					<label class="label" for="queries">
+						<span class="label-text">SQL Statements (one per line)</span>
+					</label>
+					<textarea id="queries" name="queries" placeholder="SELECT 1&#10;SELECT count() FROM system.tables" class="textarea textarea-bordered h-40" required></textarea>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<div class="form-control">
+						<label class="label" for="mode">
+							<span class="label-text">Execution Mode</span>
+						</label>
+						<select id="mode" name="mode" class="select select-bordered">
+							<option value="sequential">Sequential</option>
+							<option value="random">Random</option>
+						</select>
+					</div>
+					<div class="form-control">
+						<label class="label" for="concurrency">
+							<span class="label-text">Concurrency (workers)</span>
+						</label>
+						<input type="number" id="concurrency" name="concurrency" min="1" max="100" class="input input-bordered" value={ strconv.Itoa(defaultConcurrency) }/>
+					</div>
+					<div class="form-control">
+						<label class="label" for="iterations">
+							<span class="label-text">Iterations per worker</span>
+						</label>
+						<input type="number" id="iterations" name="iterations" min="1" class="input input-bordered" value={ strconv.Itoa(defaultIterations) }/>
+					</div>
+				</div>
+
+				<div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+					<div class="form-control">
+						<label class="label" for="duration">
+							<span class="label-text">Duration (seconds, 0 = use iterations)</span>
+						</label>
+						<input type="number" id="duration" name="duration" min="0" class="input input-bordered" value={ strconv.Itoa(defaultDuration) }/>
+					</div>
+					<div class="form-control">
+						<label class="label" for="wait_between">
+							<span class="label-text">Wait time between queries</span>
+						</label>
+						<select id="wait_between" name="wait_between" class="select select-bordered">
+							<option value="250">0.25s</option>
+							<option value="500">0.5s</option>
+							<option value="1000" selected>1s</option>
+							<option value="2000">2s</option>
+							<option value="3000">3s</option>
+							<option value="4000">4s</option>
+							<option value="5000">5s</option>
+						</select>
+					</div>
+				</div>
+
+				<div class="card-actions justify-end">
+					<a href="/" class="btn btn-ghost">Cancel</a>
+					if len(conns) == 0 {
+						<button type="submit" class="btn btn-primary" disabled>Start Run</button>
+					} else {
+						<button type="submit" class="btn btn-primary">Start Run</button>
+					}
+				</div>
+			</div>
+		</form>
+	</div>
+}
