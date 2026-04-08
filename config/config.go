@@ -22,7 +22,7 @@ func Load() *Config {
 		SQLitePath:        getEnv("SQLITE_PATH", "./chperf.db"),
 		DefaultConcurrency: getEnvInt("DEFAULT_CONCURRENCY", 5),
 		MaxConcurrency:     getEnvInt("MAX_CONCURRENCY", 100),
-		DefaultIterations:  getEnvInt("DEFAULT_ITERATIONS", 100),
+		DefaultIterations:  getEnvInt("DEFAULT_ITERATIONS", 5),
 		DefaultDurationSec: getEnvInt("DEFAULT_DURATION_SEC", 60),
 	}
 }

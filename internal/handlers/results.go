@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -32,10 +33,10 @@ func Results(repo *stats.Repository) gin.HandlerFunc {
 			return
 		}
 
-		chartData := buildChartData(repo, queries, id)
+		chartData, sortedQueries := buildChartData(repo, queries, id)
 		chartDataJSON, _ := json.Marshal(chartData)
 
-		c.HTML(http.StatusOK, "", templates.Results(run, queries, chartData, string(chartDataJSON)))
+		c.HTML(http.StatusOK, "", templates.Results(run, sortedQueries, chartData, string(chartDataJSON)))
 	}
 }
 
@@ -131,7 +132,7 @@ func ExportCSV(repo *stats.Repository) gin.HandlerFunc {
 	}
 }
 
-func buildChartData(repo *stats.Repository, queries []stats.Query, runID int64) templates.ChartData {
+func buildChartData(repo *stats.Repository, queries []stats.Query, runID int64) (templates.ChartData, []stats.Query) {
 	var perQuery []templates.QueryPercentiles
 	var labels []string
 	var timeseries []templates.QueryTimeseries
@@ -179,6 +180,21 @@ func buildChartData(repo *stats.Repository, queries []stats.Query, runID int64) 
 		})
 	}
 
+	sort.Slice(perQuery, func(i, j int) bool {
+		return perQuery[i].Max > perQuery[j].Max
+	})
+	orderByID := make(map[int64]int, len(perQuery))
+	for i, qp := range perQuery {
+		orderByID[qp.QueryID] = i
+	}
+	sort.Slice(timeseries, func(i, j int) bool {
+		return orderByID[timeseries[i].QueryID] < orderByID[timeseries[j].QueryID]
+	})
+	sortedQueries := make([]stats.Query, len(queries))
+	for _, q := range queries {
+		sortedQueries[orderByID[q.ID]] = q
+	}
+
 	overallVals, _ := repo.GetRunTimeMsForRun(runID)
 	overall := stats.Percentiles{
 		P50: stats.Percentile(overallVals, 50),
@@ -200,5 +216,5 @@ func buildChartData(repo *stats.Repository, queries []stats.Query, runID int64) 
 		OverallErrorCount: overallErrCount,
 		QueryLabels:       labels,
 		Timeseries:        timeseries,
-	}
+	}, sortedQueries
 }
