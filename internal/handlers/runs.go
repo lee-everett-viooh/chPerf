@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -48,15 +49,25 @@ func CreateRun(repo *stats.Repository, connRepo *connections.Repository, runner 
 			return
 		}
 		dsn := conn.DSN()
-		queriesText := strings.TrimSpace(c.PostForm("queries"))
-		if queriesText == "" {
-			c.String(http.StatusBadRequest, "queries are required")
-			return
-		}
 
-		queries := parseQueries(queriesText)
+		var queries []string
+		file, _, err := c.Request.FormFile("sql_file")
+		if err == nil {
+			defer file.Close()
+			data, err := io.ReadAll(file)
+			if err != nil {
+				c.String(http.StatusBadRequest, "failed to read uploaded file: %v", err)
+				return
+			}
+			queries = parseSQLFile(string(data))
+		} else {
+			queriesText := strings.TrimSpace(c.PostForm("queries"))
+			if queriesText != "" {
+				queries = parseQueries(queriesText)
+			}
+		}
 		if len(queries) == 0 {
-			c.String(http.StatusBadRequest, "at least one query is required")
+			c.String(http.StatusBadRequest, "at least one query is required (paste in the text area or upload a .sql file)")
 			return
 		}
 
@@ -176,6 +187,33 @@ func parseQueries(text string) []string {
 		if line != "" && !strings.HasPrefix(line, "--") {
 			out = append(out, line)
 		}
+	}
+	return out
+}
+
+// parseSQLFile splits a .sql file into individual queries on semicolons,
+// trimming whitespace and discarding empty/comment-only entries.
+func parseSQLFile(text string) []string {
+	chunks := strings.Split(text, ";")
+	var out []string
+	for _, chunk := range chunks {
+		q := strings.TrimSpace(chunk)
+		if q == "" {
+			continue
+		}
+		// skip chunks that are only single-line comments
+		allComments := true
+		for _, line := range strings.Split(q, "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" && !strings.HasPrefix(line, "--") {
+				allComments = false
+				break
+			}
+		}
+		if allComments {
+			continue
+		}
+		out = append(out, q)
 	}
 	return out
 }
