@@ -2,6 +2,7 @@ package stats
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 )
 
@@ -38,11 +39,12 @@ type QueryResult struct {
 	WorkerID     int
 }
 
-// Percentiles holds P50, P75, P90, P99 for latency.
+// Percentiles holds P50, P75, P90, P95, P99 for latency.
 type Percentiles struct {
 	P50 float64 `json:"p50"`
 	P75 float64 `json:"p75"`
 	P90 float64 `json:"p90"`
+	P95 float64 `json:"p95"`
 	P99 float64 `json:"p99"`
 }
 
@@ -231,6 +233,68 @@ func (r *Repository) GetRunTimeMsForRun(runID int64) ([]float64, error) {
 	return vals, rows.Err()
 }
 
+// QueryErrorSummary holds error count and distinct messages for a query.
+type QueryErrorSummary struct {
+	Count    int
+	Messages []string
+}
+
+// GetErrorSummaryForQuery returns the number of errors and distinct error messages for a query.
+func (r *Repository) GetErrorSummaryForQuery(queryID int64) (*QueryErrorSummary, error) {
+	var count int
+	err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM query_results WHERE query_id = ? AND error_message IS NOT NULL`,
+		queryID,
+	).Scan(&count)
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return &QueryErrorSummary{}, nil
+	}
+
+	rows, err := r.db.Query(
+		`SELECT error_message, COUNT(*) as cnt
+		 FROM query_results
+		 WHERE query_id = ? AND error_message IS NOT NULL
+		 GROUP BY error_message
+		 ORDER BY cnt DESC
+		 LIMIT 10`,
+		queryID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var msgs []string
+	for rows.Next() {
+		var msg string
+		var cnt int
+		if err := rows.Scan(&msg, &cnt); err != nil {
+			return nil, err
+		}
+		if cnt > 1 {
+			msgs = append(msgs, fmt.Sprintf("%s (x%d)", msg, cnt))
+		} else {
+			msgs = append(msgs, msg)
+		}
+	}
+	return &QueryErrorSummary{Count: count, Messages: msgs}, rows.Err()
+}
+
+// GetErrorCountForRun returns the total error count across all queries in a run.
+func (r *Repository) GetErrorCountForRun(runID int64) (int, error) {
+	var count int
+	err := r.db.QueryRow(
+		`SELECT COUNT(*) FROM query_results qr
+		 JOIN queries q ON q.id = qr.query_id
+		 WHERE q.run_id = ? AND qr.error_message IS NOT NULL`,
+		runID,
+	).Scan(&count)
+	return count, err
+}
+
 // RunProgress holds live progress counters for a running test.
 type RunProgress struct {
 	ExecutedCount int64 `json:"executed_count"`
@@ -346,4 +410,32 @@ func Percentile(sorted []float64, p float64) float64 {
 	}
 	frac := idx - float64(lo)
 	return sorted[lo]*(1-frac) + sorted[hi]*frac
+}
+
+// Average returns the arithmetic mean of a slice of float64 values.
+func Average(vals []float64) float64 {
+	if len(vals) == 0 {
+		return 0
+	}
+	var sum float64
+	for _, v := range vals {
+		sum += v
+	}
+	return sum / float64(len(vals))
+}
+
+// MinVal returns the minimum value from a sorted slice.
+func MinVal(sorted []float64) float64 {
+	if len(sorted) == 0 {
+		return 0
+	}
+	return sorted[0]
+}
+
+// MaxVal returns the maximum value from a sorted slice.
+func MaxVal(sorted []float64) float64 {
+	if len(sorted) == 0 {
+		return 0
+	}
+	return sorted[len(sorted)-1]
 }

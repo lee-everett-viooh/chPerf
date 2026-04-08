@@ -8,10 +8,15 @@ import (
 
 // ChartData is passed to the results page for Chart.js.
 type ChartData struct {
-	PerQuery    []QueryPercentiles   `json:"perQuery"`
-	Overall     stats.Percentiles    `json:"overall"`
-	QueryLabels []string             `json:"queryLabels"`
-	Timeseries  []QueryTimeseries    `json:"timeseries"`
+	PerQuery          []QueryPercentiles  `json:"perQuery"`
+	Overall           stats.Percentiles   `json:"overall"`
+	OverallAvg        float64             `json:"overallAvg"`
+	OverallMin        float64             `json:"overallMin"`
+	OverallMax        float64             `json:"overallMax"`
+	OverallCount      int                 `json:"overallCount"`
+	OverallErrorCount int                 `json:"overallErrorCount"`
+	QueryLabels       []string            `json:"queryLabels"`
+	Timeseries        []QueryTimeseries   `json:"timeseries"`
 }
 
 // QueryTimeseries holds latency-over-time data for a single query.
@@ -21,11 +26,17 @@ type QueryTimeseries struct {
 	Points     []stats.TimeseriesPoint  `json:"points"`
 }
 
-// QueryPercentiles holds percentiles for a single query.
+// QueryPercentiles holds percentiles and summary stats for a single query.
 type QueryPercentiles struct {
-	QueryID     int64             `json:"queryId"`
-	SQLPreview  string            `json:"sqlPreview"`
-	Percentiles stats.Percentiles `json:"percentiles"`
+	QueryID       int64             `json:"queryId"`
+	SQLPreview    string            `json:"sqlPreview"`
+	Percentiles   stats.Percentiles `json:"percentiles"`
+	Avg           float64           `json:"avg"`
+	Min           float64           `json:"min"`
+	Max           float64           `json:"max"`
+	Count         int               `json:"count"`
+	ErrorCount    int               `json:"errorCount"`
+	ErrorMessages []string          `json:"errorMessages,omitempty"`
 }
 
 templ Results(run *stats.Run, queries []stats.Query, chartData ChartData, chartDataJSON string) {
@@ -37,6 +48,106 @@ templ ResultsContent(run *stats.Run, queries []stats.Query, chartData ChartData,
 		<div class="flex justify-between items-center">
 			<h1 class="text-3xl font-bold">Results: { run.Name }</h1>
 			<a href={ "/runs/" + strconv.FormatInt(run.ID, 10) + "/export" } class="btn btn-outline">Export CSV</a>
+		</div>
+
+		<div class="stats shadow w-full">
+			<div class="stat">
+				<div class="stat-title">Queries</div>
+				<div class="stat-value text-lg">{ strconv.Itoa(len(queries)) }</div>
+			</div>
+			<div class="stat">
+				<div class="stat-title">Executed</div>
+				<div class="stat-value text-lg">{ strconv.Itoa(chartData.OverallCount) }</div>
+			</div>
+			<div class="stat">
+				<div class="stat-title">Errors</div>
+				if chartData.OverallErrorCount > 0 {
+					<div class="stat-value text-lg text-error">{ strconv.Itoa(chartData.OverallErrorCount) }</div>
+				} else {
+					<div class="stat-value text-lg text-success">0</div>
+				}
+			</div>
+			<div class="stat">
+				<div class="stat-title">Avg Latency</div>
+				<div class="stat-value text-lg">{ formatFloat(chartData.OverallAvg) }<span class="text-sm font-normal ml-1">ms</span></div>
+			</div>
+			<div class="stat">
+				<div class="stat-title">P95 Latency</div>
+				<div class="stat-value text-lg">{ formatFloat(chartData.Overall.P95) }<span class="text-sm font-normal ml-1">ms</span></div>
+			</div>
+			<div class="stat">
+				<div class="stat-title">P99 Latency</div>
+				<div class="stat-value text-lg">{ formatFloat(chartData.Overall.P99) }<span class="text-sm font-normal ml-1">ms</span></div>
+			</div>
+		</div>
+
+		<div class="space-y-2">
+			for i, qp := range chartData.PerQuery {
+				<div class={ "collapse collapse-arrow bg-base-100 shadow border", templ.KV("border-error", qp.ErrorCount > 0), templ.KV("border-base-300", qp.ErrorCount == 0) }>
+					<input type="checkbox"/>
+					<div class="collapse-title pr-12">
+						<div class="flex items-center gap-2">
+							if qp.ErrorCount > 0 {
+								<span class="text-error text-lg font-bold">✗</span>
+							} else {
+								<span class="text-success text-lg font-bold">✓</span>
+							}
+							<span class="badge badge-neutral badge-sm">{ strconv.Itoa(i + 1) }</span>
+							<span class="font-mono text-sm truncate">{ qp.SQLPreview }</span>
+						</div>
+						<div class="flex flex-wrap gap-x-4 gap-y-1 mt-1 ml-8 text-xs text-base-content/70">
+							<span>OK: <span class="font-semibold text-base-content">{ strconv.Itoa(qp.Count) }</span></span>
+							if qp.ErrorCount > 0 {
+								<span>Errors: <span class="badge badge-error badge-xs">{ strconv.Itoa(qp.ErrorCount) }</span></span>
+							}
+							<span>Avg: <span class="font-semibold text-base-content">{ formatFloat(qp.Avg) }ms</span></span>
+							<span>Min: <span class="font-semibold text-base-content">{ formatFloat(qp.Min) }ms</span></span>
+							<span>Max: <span class="font-semibold text-base-content">{ formatFloat(qp.Max) }ms</span></span>
+						</div>
+					</div>
+					<div class="collapse-content space-y-4">
+						<div>
+							<h4 class="text-xs font-semibold uppercase text-base-content/50 mb-1">SQL</h4>
+							<pre class="text-xs whitespace-pre-wrap break-all bg-base-200 p-4 rounded-lg overflow-x-auto"><code>{ queries[i].SQLText }</code></pre>
+						</div>
+						<div>
+							<h4 class="text-xs font-semibold uppercase text-base-content/50 mb-1">Percentiles</h4>
+							<div class="grid grid-cols-5 gap-2">
+								<div class="bg-base-200 rounded-lg p-2 text-center">
+									<div class="text-xs text-base-content/50">P50</div>
+									<div class="font-semibold text-sm">{ formatFloat(qp.Percentiles.P50) }ms</div>
+								</div>
+								<div class="bg-base-200 rounded-lg p-2 text-center">
+									<div class="text-xs text-base-content/50">P75</div>
+									<div class="font-semibold text-sm">{ formatFloat(qp.Percentiles.P75) }ms</div>
+								</div>
+								<div class="bg-base-200 rounded-lg p-2 text-center">
+									<div class="text-xs text-base-content/50">P90</div>
+									<div class="font-semibold text-sm">{ formatFloat(qp.Percentiles.P90) }ms</div>
+								</div>
+								<div class="bg-base-200 rounded-lg p-2 text-center">
+									<div class="text-xs text-base-content/50">P95</div>
+									<div class="font-semibold text-sm">{ formatFloat(qp.Percentiles.P95) }ms</div>
+								</div>
+								<div class="bg-base-200 rounded-lg p-2 text-center">
+									<div class="text-xs text-base-content/50">P99</div>
+									<div class="font-semibold text-sm">{ formatFloat(qp.Percentiles.P99) }ms</div>
+								</div>
+							</div>
+						</div>
+						if qp.ErrorCount > 0 {
+							<div>
+								<h4 class="text-xs font-semibold uppercase text-error mb-1">Errors</h4>
+								for _, msg := range qp.ErrorMessages {
+									<div class="alert alert-error text-xs mb-1">
+										<pre class="whitespace-pre-wrap break-all">{ msg }</pre>
+									</div>
+								}
+							</div>
+						}
+					</div>
+				</div>
+			}
 		</div>
 
 		if len(chartData.Timeseries) > 0 {
@@ -55,43 +166,6 @@ templ ResultsContent(run *stats.Run, queries []stats.Query, chartData ChartData,
 				</div>
 			</div>
 		}
-
-		<div class="card bg-base-100 shadow-xl">
-			<div class="card-body">
-				<h2 class="card-title">Percentile Table</h2>
-				<div class="overflow-x-auto">
-					<table class="table table-zebra">
-						<thead>
-							<tr>
-								<th>Query</th>
-								<th>P50 (ms)</th>
-								<th>P75 (ms)</th>
-								<th>P90 (ms)</th>
-								<th>P99 (ms)</th>
-							</tr>
-						</thead>
-						<tbody>
-							for i, qp := range chartData.PerQuery {
-								<tr>
-									<td class="max-w-xs truncate" title={ queries[i].SQLText }>{ qp.SQLPreview }</td>
-									<td>{ formatFloat(qp.Percentiles.P50) }</td>
-									<td>{ formatFloat(qp.Percentiles.P75) }</td>
-									<td>{ formatFloat(qp.Percentiles.P90) }</td>
-									<td>{ formatFloat(qp.Percentiles.P99) }</td>
-								</tr>
-							}
-							<tr class="font-bold">
-								<td>Overall</td>
-								<td>{ formatFloat(chartData.Overall.P50) }</td>
-								<td>{ formatFloat(chartData.Overall.P75) }</td>
-								<td>{ formatFloat(chartData.Overall.P90) }</td>
-								<td>{ formatFloat(chartData.Overall.P99) }</td>
-							</tr>
-						</tbody>
-					</table>
-				</div>
-			</div>
-		</div>
 
 		@RawJSONScript(chartDataJSON)
 		<script src="/static/js/results-charts.js"></script>

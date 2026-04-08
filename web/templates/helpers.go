@@ -102,6 +102,16 @@ func connectionPort(conn *connections.Connection) string {
 	return strconv.Itoa(conn.Port)
 }
 
+// truncateSQL shortens a SQL string for display, collapsing newlines.
+func truncateSQL(sql string, maxLen int) string {
+	s := strings.ReplaceAll(sql, "\n", " ")
+	s = strings.Join(strings.Fields(s), " ")
+	if len(s) > maxLen {
+		return s[:maxLen] + "..."
+	}
+	return s
+}
+
 // RawJSONScript returns a templ.Component that renders a script tag with raw JSON.
 // Escapes </script> to prevent breaking out of the tag.
 func RawJSONScript(json string) templ.Component {

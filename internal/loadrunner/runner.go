@@ -59,6 +59,12 @@ func (r *Runner) run(ctx context.Context, cfg RunConfig) {
 	useDuration := cfg.DurationSec > 0
 	endTime := time.Now().Add(time.Duration(cfg.DurationSec) * time.Second)
 
+	if useDuration {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithDeadline(ctx, endTime)
+		defer cancel()
+	}
+
 	var wg sync.WaitGroup
 	for w := 0; w < cfg.Concurrency; w++ {
 		workerID := w
@@ -116,6 +122,10 @@ func (r *Runner) runWorker(ctx context.Context, cfg RunConfig, workerID int, que
 
 		result := client.Execute(ctx, sqlText)
 
+		if ctx.Err() != nil {
+			return
+		}
+
 		var errMsg *string
 		if result.Error != nil {
 			s := result.Error.Error()
@@ -153,6 +163,12 @@ func (r *Runner) RunSequentialMode(ctx context.Context, cfg RunConfig) {
 
 		useDuration := cfg.DurationSec > 0
 		endTime := time.Now().Add(time.Duration(cfg.DurationSec) * time.Second)
+
+		if useDuration {
+			var cancel context.CancelFunc
+			ctx, cancel = context.WithDeadline(ctx, endTime)
+			defer cancel()
+		}
 
 		var wg sync.WaitGroup
 		for w := 0; w < cfg.Concurrency; w++ {
@@ -196,7 +212,13 @@ func (r *Runner) runSequentialWorker(ctx context.Context, cfg RunConfig, workerI
 				return
 			default:
 			}
+			if useDuration && time.Now().After(endTime) {
+				return
+			}
 			result := client.Execute(ctx, q.SQLText)
+			if ctx.Err() != nil {
+				return
+			}
 			var errMsg *string
 			if result.Error != nil {
 				s := result.Error.Error()
